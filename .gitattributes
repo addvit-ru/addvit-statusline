@@ -1,0 +1,10 @@
+# Force LF line endings for shell scripts — they must stay Unix-style
+# so bash can run them on macOS/Linux/WSL/Git Bash.
+*.sh text eol=lf
+
+# Keep text files as text (Git normalises to LF in repo, restores platform
+# line endings on checkout where appropriate).
+*.md text
+*.json text
+LICENSE text
+.gitattributes text
