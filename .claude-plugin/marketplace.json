@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "addvit-ru",
+  "description": "addvit-ru's personal collection of Claude Code plugins",
+  "owner": {
+    "name": "addvit-ru"
+  },
+  "plugins": [
+    {
+      "name": "addvit-statusline",
+      "description": "Rich statusLine for Claude Code: model, context bar, session tokens, rolling 5h/24h/7d token windows, API rate-limits with countdown to reset, cwd and git branch.",
+      "category": "productivity",
+      "source": "./plugins/addvit-statusline",
+      "homepage": "https://github.com/addvit-ru/addvit-statusline"
+    }
+  ]
+}
