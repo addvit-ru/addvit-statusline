@@ -1,13 +1,11 @@
 # addvit-statusline
 
-A rich, single-line statusline for Claude Code that tracks context, rolling token windows, and API rate-limits with a live countdown to reset.
-
-![example](https://placehold.co/800x60/111/0cf?text=Opus+4.7+%7C+%E2%96%88%E2%96%88%E2%96%88%E2%96%91%E2%96%91+42%25+%7C+425k%2F1000k+%7C+sess%3A850k+%7C+5h%3A24%25+%282h33m%29+7d%3A41%25+%283d5h%29)
+A rich, single-line statusline for Claude Code showing context usage, cumulative session tokens, and Claude.ai subscription rate-limits with a live countdown to reset.
 
 ## What it shows
 
 ```
-Opus 4.7 │ ███░░░░░ 42% │ 425k/1000k │ sess:850k │ 5h:██░░░ · 24h:█████░ · 7d:████████ │ 5h:24% (2h33m) 7d:41% (3d5h) │ ~/code/project │ (main)
+Opus 4.7 │ ███░░░░░ 42% │ 425k/1000k │ sess:850k │ 5h:24% (2:33:05) 7d:41% (3d5h) │ ~/code/project │ (main)
 ```
 
 | Segment | Meaning |
@@ -16,15 +14,22 @@ Opus 4.7 │ ███░░░░░ 42% │ 425k/1000k │ sess:850k │ 5h:�
 | `███░░░░░ 42%` | Context-window usage, colour-coded: cyan <50%, yellow ≥50%, red ≥80% |
 | `425k/1000k` | Tokens used / context window size |
 | `sess:850k` | Cumulative session input+output tokens |
-| `5h / 24h / 7d` bars | Rolling token spend over the last 5h / 24h / 7d, scaled to the 7d total. Data comes from a local JSONL log (`~/.claude/statusline-usage.jsonl`) that this script appends to on every render |
-| `5h:24% (2h33m)` | Claude.ai subscription (Pro/Max) 5-hour rate-limit %. Parenthesised value = time remaining until the window resets |
-| `7d:41% (3d5h)` | Same for the 7-day rolling rate-limit window |
+| `5h:24% (2:33:05)` | Claude.ai subscription (Pro/Max) 5-hour rate-limit %. Parenthesised value = time remaining until the window resets |
+| `7d:41% (3d5h)` | Same for the 7-day rate-limit window |
 | `~/code/project` | Current working directory (with `~` substitution) |
 | `(main)` | Git branch, if the cwd is a git repository |
 
-Time format: `>24h` → `NdHh`, `<24h` → `HhMMm`, `<1h` → `Mm`.
+Time format (designed so the countdown ticks live with `refreshInterval`):
+- `≥ 1d` → `NdHh` (e.g. `3d5h` — seconds unnecessary for the 7d window)
+- `< 1d, ≥ 1h` → `H:MM:SS` (e.g. `4:44:55` — typical 5h rate-limit display, ticks every second)
+- `< 1h, ≥ 1m` → `MM:SS` (e.g. `40:26`)
+- `< 1m` → `0:SS` (e.g. `0:42`)
 
-> Rate-limit fields are only available to Claude.ai subscribers (Pro/Max) after the first API response in a session. Until then, segment 6 is simply hidden.
+> Rate-limit fields are only available to Claude.ai subscribers (Pro/Max) after the first API response in a session. Until then, that segment is simply hidden.
+
+### Live countdown
+
+For the countdown to tick every second (instead of only on Claude Code events like incoming messages — which don't fire while you're rate-limited), the installer sets `"refreshInterval": 2` inside `settings.json` → `statusLine`. That tells Claude Code to re-run the script every 2 seconds. You can tune the number (minimum `1`) if you want it smoother or cheaper.
 
 ## Install
 
@@ -52,7 +57,8 @@ Add to `~/.claude/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "bash ~/.claude/statusline-command.sh"
+    "command": "bash ~/.claude/statusline-command.sh",
+    "refreshInterval": 2
   }
 }
 ```
@@ -73,11 +79,11 @@ Restart Claude Code (or start a new session).
 /plugin uninstall addvit-statusline@addvit-ru
 ```
 
-Then remove `~/.claude/statusline-command.sh` and the `statusLine` key from `~/.claude/settings.json`. Optionally delete `~/.claude/statusline-usage.jsonl` (the rolling-window log).
+Then remove `~/.claude/statusline-command.sh` and the `statusLine` key from `~/.claude/settings.json`.
 
 ## Privacy
 
-The rolling-window log (`~/.claude/statusline-usage.jsonl`) records per-render events as `{ts, session_id, input_tokens, output_tokens}`. No prompts, tool calls, file paths, or other content are stored.
+The statusline script only reads the JSON that Claude Code pipes to it on stdin and echoes a formatted string — nothing is persisted, logged, or sent anywhere.
 
 ## License
 

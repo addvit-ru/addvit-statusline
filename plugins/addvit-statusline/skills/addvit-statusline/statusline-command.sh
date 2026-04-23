@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Claude Code analytics dashboard — compact single-line status
-# Tracks rolling 5h/24h/7d token windows via JSONL log.
+# Shows: model, context bar/%, used/total tokens, session tokens,
+# API rate-limit windows (5h/7d) with live countdown to reset, cwd, git branch.
 
 # ── Constants ────────────────────────────────────────────────────────────────
-LOG="C:/claude-home-1/.claude/statusline-usage.jsonl"
 BAR_WIDTH=8          # filled+empty chars per bar
 SEP=" \033[2m│\033[0m "   # dim pipe separator
 
@@ -35,37 +35,7 @@ shorten_model() {
 }
 model_short=$(shorten_model "$model_full")
 
-# ── Append to usage log (only when we have real token data) ──────────────────
 now_epoch=$(date +%s)
-if [ -n "$cur_in" ] && [ -n "$cur_out" ] && [ -n "$session_id" ]; then
-  total_cur=$(( cur_in + cur_out ))
-  printf '{"ts":%d,"sid":"%s","in":%s,"out":%s}\n' \
-    "$now_epoch" "$session_id" "$cur_in" "$cur_out" >> "$LOG" 2>/dev/null
-fi
-
-# ── Compute rolling window sums from log ─────────────────────────────────────
-# We only read the last 50 000 lines to keep it fast; entries older than 7d
-# are ignored. jq does the heavy lifting in a single pass.
-win_5h=0; win_24h=0; win_7d=0
-if [ -f "$LOG" ]; then
-  cutoff_5h=$(( now_epoch - 18000 ))
-  cutoff_24h=$(( now_epoch - 86400 ))
-  cutoff_7d=$(( now_epoch - 604800 ))
-  read -r win_5h win_24h win_7d < <(
-    tail -n 50000 "$LOG" 2>/dev/null \
-    | jq -r --argjson c5 "$cutoff_5h" --argjson c24 "$cutoff_24h" --argjson c7 "$cutoff_7d" '
-        select(.ts != null)
-        | select(.ts >= $c7)
-        | [
-            (if .ts >= $c5  then (.in + .out) else 0 end),
-            (if .ts >= $c24 then (.in + .out) else 0 end),
-            (.in + .out)
-          ]
-        | @tsv
-      ' 2>/dev/null \
-    | awk '{s5+=$1; s24+=$2; s7+=$3} END {print s5+0, s24+0, s7+0}'
-  )
-fi
 
 # ── Helper: format token count as k-string ───────────────────────────────────
 fmt_k() {
@@ -87,23 +57,29 @@ ascii_bar() {
   }'
 }
 
-# ── Helper: format a duration in seconds as "1d2h", "2h34m", or "45m" ────────
+# ── Helper: format a duration in seconds ─────────────────────────────────────
+# >=1d  → "1d2h"      (day+hour — always far from reset, no need for finer)
+# <1d   → "H:MM:SS"   (live ticker, ticks every refresh)
+#         "MM:SS"     (under 1h, same format, drop leading 0h)
+#         "0:SS"      (under 1m)
+# ≤0    → "0:00"
 fmt_remaining() {
   local secs="$1"
   [ -z "$secs" ] && { echo ""; return; }
   if [ "$secs" -le 0 ]; then
-    echo "0m"
+    echo "0:00"
     return
   fi
   local days=$(( secs / 86400 ))
   local hours=$(( (secs % 86400) / 3600 ))
   local mins=$(( (secs % 3600) / 60 ))
+  local ss=$(( secs % 60 ))
   if [ "$days" -gt 0 ]; then
     printf "%dd%dh" "$days" "$hours"
   elif [ "$hours" -gt 0 ]; then
-    printf "%dh%02dm" "$hours" "$mins"
+    printf "%d:%02d:%02d" "$hours" "$mins" "$ss"
   else
-    printf "%dm" "$mins"
+    printf "%d:%02d" "$mins" "$ss"
   fi
 }
 
@@ -152,31 +128,8 @@ if [ -n "$sess_in" ] || [ -n "$sess_out" ]; then
   fi
 fi
 
-# 5. Rolling window bars (5h / 24h / 7d)
-#    We express each window relative to its own 7d max so bars scale sensibly.
-#    If all windows are 0 (no log yet), skip this section.
-if [ "$win_7d" -gt 0 ]; then
-  # Estimate a "max" as the 7d total so all bars are relative
-  max_ref="$win_7d"
-  pct_5h=$(awk  "BEGIN { printf \"%.1f\", $win_5h  / $max_ref * 100 }")
-  pct_24h=$(awk "BEGIN { printf \"%.1f\", $win_24h / $max_ref * 100 }")
-  pct_7d=100
-
-  bar_5h=$(ascii_bar  "$pct_5h"  5)
-  bar_24h=$(ascii_bar "$pct_24h" 6)
-  bar_7d=$(ascii_bar  "$pct_7d"  8)
-
-  col_5h=$(pct_color  "$pct_5h")
-  col_24h=$(pct_color "$pct_24h")
-
-  printf -v p \
-    "${col_5h}5h:%s\033[0m \033[2m·\033[0m ${col_24h}24h:%s\033[0m \033[2m·\033[0m \033[36m7d:%s\033[0m" \
-    "$bar_5h" "$bar_24h" "$bar_7d"
-  parts+=("$p")
-fi
-
-# 6. Rate-limit windows from API (5h / 7d) — shown when available
-#    Formatted as "5h:23% (2h34m)" where the parenthesised value is the
+# 5. Rate-limit windows from API (5h / 7d) — shown when available
+#    Formatted as "5h:23% (2:33:05)" where the parenthesised value is the
 #    time remaining until the window resets.
 if [ -n "$rl_5h" ] || [ -n "$rl_7d" ]; then
   rl_str=""
@@ -204,7 +157,7 @@ if [ -n "$rl_5h" ] || [ -n "$rl_7d" ]; then
   [ -n "$rl_str" ] && parts+=("$rl_str")
 fi
 
-# 7. Directory (blue, ~ substitution)
+# 6. Directory (blue, ~ substitution)
 home_dir="$HOME"
 display_cwd="$raw_cwd"
 if [ -n "$home_dir" ] && [[ "$display_cwd" == "$home_dir"* ]]; then
@@ -213,7 +166,7 @@ fi
 printf -v p "\033[34m%s\033[0m" "$display_cwd"
 parts+=("$p")
 
-# 8. Git branch (green)
+# 7. Git branch (green)
 branch=""
 if git -C "$raw_cwd" --no-optional-locks rev-parse --is-inside-work-tree 2>/dev/null | grep -q true; then
   branch=$(git -C "$raw_cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null)
