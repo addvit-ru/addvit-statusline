@@ -1,17 +1,18 @@
 # addvit-statusline
 
-A rich, single-line statusline for Claude Code showing context usage, cumulative session tokens, and Claude.ai subscription rate-limits with a live countdown to reset.
+A rich, single-line statusline for Claude Code showing context usage, cumulative session tokens, and Claude.ai subscription rate-limits with a live countdown to reset. Warns you proactively when the context window is getting tight, before auto-compaction kicks in.
 
 ## What it shows
 
 ```
-Opus 4.7 │ ███░░░░░ 42% │ 425k/1000k │ sess:850k │ 5h:24% (2:33:05) 7d:41% (3d5h) │ ~/code/project │ (main)
+⚠ plan new session │ Opus 4.7 │ ctx: ██████░░ 78% │ 785k/1000k │ sess:850k │ 5h:24% (2:33:05) 7d:41% (3d5h) │ ~/code/project │ (main)
 ```
 
 | Segment | Meaning |
 |---|---|
+| `⚠ plan new session` / `⚠ NEW SESSION` | Context-window warning. Bold red at ≥75%, white-on-red at ≥90%. Hidden below 75%. |
 | `Opus 4.7` | Current model (the `Claude ` prefix is stripped) |
-| `███░░░░░ 42%` | Context-window usage, colour-coded: cyan <50%, yellow ≥50%, red ≥80% |
+| `ctx: ███░░░░░ 42%` | Context-window usage, colour-coded: cyan <50%, yellow ≥50%, red ≥80% |
 | `425k/1000k` | Tokens used / context window size |
 | `sess:850k` | Cumulative session input+output tokens |
 | `5h:24% (2:33:05)` | Claude.ai subscription (Pro/Max) 5-hour rate-limit %. Parenthesised value = time remaining until the window resets |
@@ -26,6 +27,12 @@ Time format (designed so the countdown ticks live with `refreshInterval`):
 - `< 1m` → `0:SS` (e.g. `0:42`)
 
 > Rate-limit fields are only available to Claude.ai subscribers (Pro/Max) after the first API response in a session. Until then, that segment is simply hidden.
+
+> `resets_at` is accepted in two formats: Unix epoch seconds (numeric) or ISO-8601 string. The script auto-detects and normalises.
+
+### New-session warning
+
+When the context window crosses **75%**, the status line prepends a bold red `⚠ plan new session`. At **90%** it switches to a white-on-red block `⚠ NEW SESSION`. This is a heads-up so you can wrap up the current task and `/clear` before Claude Code's auto-compaction kicks in (typically near the limit) — compaction loses some nuance, and proactively starting a fresh session preserves more useful context.
 
 ### Live countdown
 

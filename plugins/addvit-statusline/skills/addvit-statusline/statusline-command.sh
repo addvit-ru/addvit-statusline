@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code analytics dashboard — compact single-line status
-# Shows: model, context bar/%, used/total tokens, session tokens,
+# Shows: new-session warning, model, context bar/%, used/total tokens, session tokens,
 # API rate-limit windows (5h/7d) with live countdown to reset, cwd, git branch.
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -24,6 +24,20 @@ rl_5h=$(echo "$input"       | jq -r '.rate_limits.five_hour.used_percentage // e
 rl_7d=$(echo "$input"       | jq -r '.rate_limits.seven_day.used_percentage // empty')
 rl_5h_reset=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
 rl_7d_reset=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
+
+# ── Normalize resets_at to Unix epoch (accept epoch seconds or ISO-8601) ─────
+to_epoch() {
+  local v="$1"
+  [ -z "$v" ] && { echo ""; return; }
+  # already numeric epoch seconds
+  if [[ "$v" =~ ^[0-9]+$ ]]; then echo "$v"; return; fi
+  # try ISO-8601 via GNU date
+  local e
+  e=$(date -d "$v" +%s 2>/dev/null)
+  [ -n "$e" ] && echo "$e"
+}
+rl_5h_reset=$(to_epoch "$rl_5h_reset")
+rl_7d_reset=$(to_epoch "$rl_7d_reset")
 
 # ── Shorten model name: keep only "Name X.Y" after last space-separated brand─
 # e.g. "Claude 3.5 Sonnet" -> "Sonnet 3.5"  /  "Claude Sonnet 4.6" -> "Sonnet 4.6"
@@ -62,12 +76,14 @@ ascii_bar() {
 # <1d   → "H:MM:SS"   (live ticker, ticks every refresh)
 #         "MM:SS"     (under 1h, same format, drop leading 0h)
 #         "0:SS"      (under 1m)
-# ≤0    → "0:00"
+# ≤0    → ""          (window already reset, API hasn't refreshed resets_at)
 fmt_remaining() {
   local secs="$1"
   [ -z "$secs" ] && { echo ""; return; }
+  # Negative / zero: window already reset but API hasn't refreshed resets_at.
+  # Return empty so caller skips the "(..)" segment entirely.
   if [ "$secs" -le 0 ]; then
-    echo "0:00"
+    echo ""
     return
   fi
   local days=$(( secs / 86400 ))
@@ -97,18 +113,28 @@ pct_color() {
 # ── Build parts array ────────────────────────────────────────────────────────
 parts=()
 
+# 0. New-session warning (shown first, only when context is getting tight)
+if [ -n "$ctx_used" ]; then
+  used_int=$(printf '%.0f' "$ctx_used")
+  if [ "$used_int" -ge 90 ]; then
+    parts+=("\033[1;41;37m ⚠ NEW SESSION \033[0m")
+  elif [ "$used_int" -ge 75 ]; then
+    parts+=("\033[1;31m⚠ plan new session\033[0m")
+  fi
+fi
+
 # 1. Model name (magenta)
 if [ -n "$model_short" ]; then
   printf -v p "\033[35m%s\033[0m" "$model_short"
   parts+=("$p")
 fi
 
-# 2. Context % with ASCII bar (color-coded)
+# 2. Context: "ctx: ███░░ 56%" (color-coded, prefix makes it scannable)
 if [ -n "$ctx_used" ]; then
   used_int=$(printf '%.0f' "$ctx_used")
   col=$(pct_color "$ctx_used")
   bar=$(ascii_bar "$ctx_used" "$BAR_WIDTH")
-  printf -v p "${col}%s %d%%\033[0m" "$bar" "$used_int"
+  printf -v p "\033[2mctx:\033[0m ${col}%s %d%%\033[0m" "$bar" "$used_int"
   parts+=("$p")
 fi
 

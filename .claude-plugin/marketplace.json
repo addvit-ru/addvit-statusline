@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "addvit-statusline",
-      "description": "Rich statusLine for Claude Code: model, context bar, session tokens, API rate-limits (5h/7d) with live countdown to reset, cwd and git branch.",
+      "description": "Rich statusLine for Claude Code: new-session warning at ≥75% context, model, context bar, session tokens, API rate-limits (5h/7d) with live countdown to reset, cwd and git branch.",
       "category": "productivity",
       "source": "./plugins/addvit-statusline",
       "homepage": "https://github.com/addvit-ru/addvit-statusline"

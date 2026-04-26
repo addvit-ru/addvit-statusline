@@ -2,7 +2,7 @@
 
 A personal Claude Code marketplace by [@addvit-ru](https://github.com/addvit-ru) that currently hosts one plugin:
 
-- **[addvit-statusline](plugins/addvit-statusline/)** — rich statusLine for Claude Code with live rate-limit countdowns.
+- **[addvit-statusline](plugins/addvit-statusline/)** — rich statusLine for Claude Code with new-session warning, live rate-limit countdowns and ISO-8601-aware reset parsing.
 
 ## Install a plugin from this marketplace
 
@@ -57,7 +57,7 @@ Fork https://github.com/anthropics/claude-plugins-official, add the entry below 
 ```json
 {
   "name": "addvit-statusline",
-  "description": "Rich statusLine: context bar, API rate-limits (5h/7d) with live countdown to reset (5h:24% (2:33:05)), cwd and git branch.",
+  "description": "Rich statusLine: new-session warning at ≥75% context, API rate-limits (5h/7d) with live countdown to reset (5h:24% (2:33:05)), cwd and git branch.",
   "category": "productivity",
   "author": { "name": "addvit-ru" },
   "source": {

@@ -1,8 +1,8 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "addvit-statusline",
-  "version": "0.1.1",
-  "description": "Rich statusLine for Claude Code: model, context bar, session tokens, API rate-limits (5h/7d) with live countdown to reset (5h:24% (2:33:05)), cwd and git branch.",
+  "version": "0.2.0",
+  "description": "Rich statusLine for Claude Code: new-session warning at ≥75% context, model, context bar, session tokens, API rate-limits (5h/7d) with live countdown to reset, cwd and git branch.",
   "author": {
     "name": "addvit-ru"
   },
@@ -12,6 +12,7 @@
     "rate-limits",
     "context-window",
     "countdown",
+    "session-warning",
     "productivity"
   ],
   "homepage": "https://github.com/addvit-ru/addvit-statusline"
